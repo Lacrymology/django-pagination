@@ -139,16 +139,35 @@ def paginate(context, window=DEFAULT_WINDOW, hashtag=''):
         records['last'] = records['first'] + paginator.per_page - 1
         if records['last'] + paginator.orphans >= paginator.count:
             records['last'] = paginator.count
-        # First and last are simply the first *n* pages and the last *n* pages,
-        # where *n* is the current window size.
-        first = set(page_range[:window])
-        last = set(page_range[-window:])
+
+        # First and last are simply the first *n* pages and the last *n*
+        # pages, where *n* is the current window size.
+        # ... unless the start and end paramter have been set
+        if 'paginate_start' in context:
+            start = context['paginate_start']
+        else:
+            start = window
+        if 'paginate_end' in context:
+            end = context['paginate_end']
+        else:
+            end = window
+        first = set(page_range[:start])
+        last = set(page_range[-end:])
+
         # Now we look around our current page, making sure that we don't wrap
         # around.
-        current_start = page_obj.number-1-window
+        if 'paginate_before' in context:
+            before = context['paginate_before']
+        else:
+            before = window
+        current_start = page_obj.number-1-before
         if current_start < 0:
             current_start = 0
-        current_end = page_obj.number-1+window
+        if 'paginate_after' in context:
+            after = context['paginate_after']
+        else:
+            after = window
+        current_end = page_obj.number-1+after
         if current_end < 0:
             current_end = 0
         current = set(page_range[current_start:current_end])
@@ -161,20 +180,21 @@ def paginate(context, window=DEFAULT_WINDOW, hashtag=''):
             second_list = list(current)
             second_list.sort()
             pages.extend(first_list)
-            diff = second_list[0] - first_list[-1]
-            # If there is a gap of two, between the last page of the first
-            # set and the first page of the current set, then we're missing a
-            # page.
-            if diff == 2:
-                pages.append(second_list[0] - 1)
-            # If the difference is just one, then there's nothing to be done,
-            # as the pages need no elusion and are correct.
-            elif diff == 1:
-                pass
-            # Otherwise, there's a bigger gap which needs to be signaled for
-            # elusion, by pushing a None value to the page list.
-            else:
-                pages.append(None)
+            if first_list:
+                diff = second_list[0] - first_list[-1]
+                # If there is a gap of two, between the last page of the first
+                # set and the first page of the current set, then we're missing a
+                # page.
+                if diff == 2:
+                    pages.append(second_list[0] - 1)
+                    # If the difference is just one, then there's nothing to be done,
+                    # as the pages need no elusion and are correct.
+                elif diff == 1:
+                    pass
+                # Otherwise, there's a bigger gap which needs to be signaled for
+                # elusion, by pushing a None value to the page list.
+                else:
+                    pages.append(None)
             pages.extend(second_list)
         else:
             unioned = list(first.union(current))
